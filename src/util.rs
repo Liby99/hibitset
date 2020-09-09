@@ -7,7 +7,7 @@ pub const BITS: usize = 6;
 #[cfg(target_pointer_width = "32")]
 pub const BITS: usize = 5;
 /// Amount of layers in the hierarchical bitset.
-pub const LAYERS: usize = 4;
+pub const LAYERS: usize = 5;
 pub const MAX: usize = BITS * LAYERS;
 /// Maximum amount of bits per bitset.
 pub const MAX_EID: usize = 2 << MAX - 1;
@@ -18,8 +18,10 @@ pub const SHIFT0: usize = 0;
 pub const SHIFT1: usize = SHIFT0 + BITS;
 /// Layer2 shift (second layer).
 pub const SHIFT2: usize = SHIFT1 + BITS;
-/// Top layer shift.
+/// Layer3 shift (first layer).
 pub const SHIFT3: usize = SHIFT2 + BITS;
+/// Layer4 shift
+pub const SHIFT4: usize = SHIFT3 + BITS;
 
 pub trait Row: Sized + Copy {
     /// Location of the bit in the row.
@@ -51,8 +53,8 @@ impl Row for Index {
 ///
 /// Returns them in (Layer0, Layer1, Layer2) order.
 #[inline]
-pub fn offsets(bit: Index) -> (usize, usize, usize) {
-    (bit.offset(SHIFT1), bit.offset(SHIFT2), bit.offset(SHIFT3))
+pub fn offsets(bit: Index) -> (usize, usize, usize, usize) {
+    (bit.offset(SHIFT1), bit.offset(SHIFT2), bit.offset(SHIFT3), bit.offset(SHIFT4))
 }
 
 /// Finds the highest bit that splits set bits of the `usize`

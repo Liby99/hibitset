@@ -28,7 +28,8 @@ use {BitSetLike, DrainableBitSet};
 /// [`BitSet`]: ../struct.BitSet.html
 #[derive(Debug)]
 pub struct AtomicBitSet {
-    layer3: AtomicUsize,
+    layer4: AtomicUsize,
+    layer3: Vec<AtomicUsize>,
     layer2: Vec<AtomicUsize>,
     layer1: Vec<AtomicBlock>,
 }
@@ -46,7 +47,7 @@ impl AtomicBitSet {
     /// this will panic if the Index is out of range.
     #[inline]
     pub fn add_atomic(&self, id: Index) -> bool {
-        let (_, p1, p2) = offsets(id);
+        let (_, p1, p2, p3) = offsets(id);
 
         // While it is tempting to check of the bit was set and exit here if it
         // was, this can result in a data race. If this thread and another
@@ -55,7 +56,8 @@ impl AtomicBitSet {
         // incorrect state. The window is small, but it exists.
         let set = self.layer1[p1].add(id);
         self.layer2[p2].fetch_or(id.mask(SHIFT2), Ordering::Relaxed);
-        self.layer3.fetch_or(id.mask(SHIFT3), Ordering::Relaxed);
+        self.layer3[p3].fetch_or(id.mask(SHIFT3), Ordering::Relaxed);
+        self.layer4.fetch_or(id.mask(SHIFT4), Ordering::Relaxed);
         set
     }
 
@@ -65,14 +67,15 @@ impl AtomicBitSet {
     pub fn add(&mut self, id: Index) -> bool {
         use std::sync::atomic::Ordering::Relaxed;
 
-        let (_, p1, p2) = offsets(id);
+        let (_, p1, p2, p3) = offsets(id);
         if self.layer1[p1].add(id) {
             return true;
         }
 
         self.layer2[p2].store(self.layer2[p2].load(Relaxed) | id.mask(SHIFT2), Relaxed);
-        self.layer3
-            .store(self.layer3.load(Relaxed) | id.mask(SHIFT3), Relaxed);
+        self.layer3[p3].store(self.layer3[p3].load(Relaxed) | id.mask(SHIFT3), Relaxed);
+        self.layer4
+            .store(self.layer4.load(Relaxed) | id.mask(SHIFT4), Relaxed);
         false
     }
 
@@ -82,7 +85,7 @@ impl AtomicBitSet {
     #[inline]
     pub fn remove(&mut self, id: Index) -> bool {
         use std::sync::atomic::Ordering::Relaxed;
-        let (_, p1, p2) = offsets(id);
+        let (_, p1, p2, p3) = offsets(id);
 
         // if the bitmask was set we need to clear
         // its bit from layer0 to 3. the layers above only
@@ -104,8 +107,14 @@ impl AtomicBitSet {
             return true;
         }
 
-        let v = self.layer3.load(Relaxed) & !id.mask(SHIFT3);
-        self.layer3.store(v, Relaxed);
+        let v = self.layer3[p3].load(Relaxed) & !id.mask(SHIFT3);
+        self.layer3[p3].store(v, Relaxed);
+        if v != 0 {
+            return true;
+        }
+
+        let v = self.layer4.load(Relaxed) & !id.mask(SHIFT4);
+        self.layer4.store(v, Relaxed);
         return true;
     }
 
@@ -123,7 +132,7 @@ impl AtomicBitSet {
         // that are already clear. In the best case when the set is already cleared,
         // this will only touch the highest layer.
 
-        let (mut m3, mut m2) = (self.layer3.swap(0, Ordering::Relaxed), 0usize);
+        let (mut m4, mut m3, mut m2) = (self.layer4.swap(0, Ordering::Relaxed), 0usize, 0usize);
         let mut offset = 0;
 
         loop {
@@ -145,6 +154,14 @@ impl AtomicBitSet {
                 m2 = self.layer2[bit].swap(0, Ordering::Relaxed);
                 continue;
             }
+
+            if m4 != 0 {
+                let bit = m4.trailing_zeros() as usize;
+                m4 &= !(1 << bit);
+                offset = bit << BITS;
+                m3 = self.layer3[bit].swap(0, Ordering::Relaxed);
+                continue;
+            }
             break;
         }
     }
@@ -152,8 +169,12 @@ impl AtomicBitSet {
 
 impl BitSetLike for AtomicBitSet {
     #[inline]
-    fn layer3(&self) -> usize {
-        self.layer3.load(Ordering::Relaxed)
+    fn layer4(&self) -> usize {
+        self.layer4.load(Ordering::Relaxed)
+    }
+    #[inline]
+    fn layer3(&self, i: usize) -> usize {
+        self.layer3[i].load(Ordering::Relaxed)
     }
     #[inline]
     fn layer2(&self, i: usize) -> usize {
@@ -188,14 +209,18 @@ impl DrainableBitSet for AtomicBitSet {
 impl Default for AtomicBitSet {
     fn default() -> Self {
         AtomicBitSet {
-            layer3: Default::default(),
-            layer2: repeat(0)
+            layer4: Default::default(),
+            layer3: repeat(0)
                 .map(|_| AtomicUsize::new(0))
                 .take(1 << BITS)
                 .collect(),
+            layer2: repeat(0)
+                .map(|_| AtomicUsize::new(0))
+                .take(1 << (2 * BITS))
+                .collect(),
             layer1: repeat(0)
                 .map(|_| AtomicBlock::new())
-                .take(1 << (2 * BITS))
+                .take(1 << (4 * BITS))
                 .collect(),
         }
     }

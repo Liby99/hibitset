@@ -50,7 +50,7 @@ impl<'a> BitIter<&'a mut BitSet> {
             let idx = (self.prefix[lower] >> BITS) as usize;
             *self.set.layer_mut(lower, idx) = 0;
             if level == LAYERS - 1 {
-                self.set.layer3 &= !((2 << idx) - 1);
+                self.set.layer4 &= !((2 << idx) - 1);
             }
         }
     }
