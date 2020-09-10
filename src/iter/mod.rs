@@ -125,7 +125,10 @@ mod tests {
             set.add(rng.gen_range(0, limit));
         }
         (&mut set).iter().clear();
-        assert_eq!(0, set.layer3);
+        assert_eq!(0, set.layer4);
+        for &i in &set.layer3 {
+            assert_eq!(0, i);
+        }
         for &i in &set.layer2 {
             assert_eq!(0, i);
         }

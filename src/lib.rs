@@ -19,16 +19,17 @@
 //! one bit for each `usize` bits of Layer 0. If any bit in that `usize`
 //! of Layer 0 is set, the bit in Layer 1 will be set.
 //!
-//! There are, in total, four layers. Layers 1 through 3 are each a
+//! There are, in total, five layers. Layers 1 through 4 are each a
 //! a summary of the layer immediately below them.
 //!
 //! ```no_compile
-//! Example, with an imaginary 4-bit usize:
+//! Example, with an imaginary 2-bit usize:
 //!
-//! Layer 3: 1------------------------------------------------ ...
-//! Layer 2: 1------------------ 1------------------ 0-------- ...
-//! Layer 1: 1--- 0--- 0--- 0--- 1--- 0--- 1--- 0--- 0--- 0--- ...
-//! Layer 0: 0010 0000 0000 0000 0011 0000 1111 0000 0000 0000 ...
+//! Layer 4: 1---------------------- 1---------------------- 0- ...
+//! Layer 3: 1---------- 0---------- 1---------- 1---------- 0- ...
+//! Layer 2: 1---- 0---- 0---- 0---- 1---- 0---- 1---- 0---- 0- ...
+//! Layer 1: 0- 1- 0- 0- 0- 0- 0- 0- 0- 1- 0- 0- 1- 1- 0- 0- 0- ...
+//! Layer 0: 00 10 00 00 00 00 00 00 00 11 00 00 11 11 00 00 00 ...
 //! ```
 //!
 //! This method makes operations that operate over the whole `BitSet`,
@@ -36,9 +37,9 @@
 //! any bit in any summary layer is zero, an entire range of bits
 //! below it can be skipped.)
 //!
-//! However, there is a maximum on index size. The top layer (Layer 3)
+//! However, there is a maximum on index size. The top layer (Layer 4)
 //! of the BitSet is a single `usize` long. This makes the maximum index
-//! `usize**4` (`1,048,576` for a 32-bit `usize`, `16,777,216` for a
+//! `usize**5` (`33,554,432` for a 32-bit `usize`, `1,073,741,824` for a
 //! 64-bit `usize`). Attempting to add indices larger than that will cause
 //! the `BitSet` to panic.
 //!

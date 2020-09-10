@@ -74,8 +74,7 @@ impl AtomicBitSet {
 
         self.layer2[p2].store(self.layer2[p2].load(Relaxed) | id.mask(SHIFT2), Relaxed);
         self.layer3[p3].store(self.layer3[p3].load(Relaxed) | id.mask(SHIFT3), Relaxed);
-        self.layer4
-            .store(self.layer4.load(Relaxed) | id.mask(SHIFT4), Relaxed);
+        self.layer4.store(self.layer4.load(Relaxed) | id.mask(SHIFT4), Relaxed);
         false
     }
 
